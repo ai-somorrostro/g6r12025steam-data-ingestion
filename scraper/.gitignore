@@ -1,0 +1,57 @@
+# Entorno virtual de Python
+.venv/
+venv/
+env/
+ENV/
+
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Datos generados por el scraper
+# Ignora todo el contenido de data/ salvo archivos de control
+data/*
+!data/.gitkeep
+*.json
+*.ndjson
+*.csv
+
+# Logs generados
+logs/*
+!logs/.gitkeep
+*.log
+*.log.*
+*.out
+*.err
+
+# Archivos de configuración del IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Distribución / empaquetado
+build/
+dist/
+*.egg-info/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Variables de entorno
+.env
+.env.local
+
+# Herramientas/estado local
+.python-version
+.cache/
+pip-log.txt
