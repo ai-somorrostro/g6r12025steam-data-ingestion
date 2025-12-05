@@ -190,6 +190,3 @@ O ejecuta el setup completo (verifica instalaciones + ejecuta pipeline):
 - **Modelo**: `paraphrase-multilingual-mpnet-base-v2` (278M parámetros, 768 dims)
 - **Backend ML**: PyTorch (CPU-only)
 - **Formato de datos**: NDJSON (compatible con Filebeat/Logstash/Elasticsearch)
-
-
-.
