@@ -125,10 +125,22 @@ echo "[*] Ejecutando run_pipeline.py..."
 echo ""
 python scripts/run_pipeline.py || log_fail "Fallo ejecutando run_pipeline.py"
 
+
+
 echo ""
 echo "[*] Ejecutando vectorizador.py..."
 echo ""
 python scripts/vectorizador.py || log_fail "Fallo ejecutando vectorizador.py"
+
+echo ""
+echo "[*] Ejecutando pipeline de extracción y resumen (flux.sh)..."
+echo ""
+bash /home/g6/reto/imp-futuras/flux.sh || log_fail "Fallo ejecutando flux.sh"
+
+echo ""
+echo "[*] Ejecutando desc-changer.py para reemplazar descripciones..."
+echo ""
+python /home/g6/reto/scraper/scripts/desc-changer.py || log_fail "Fallo ejecutando desc-changer.py"
 
 echo ""
 # Sincronizar datos vectorizados a máquina remota

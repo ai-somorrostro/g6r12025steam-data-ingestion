@@ -59,13 +59,14 @@ def procesar_pipeline():
                 juego['detailed_description'] = desc_larga_limpia # Actualizamos el objeto original
 
                 # --- CONSTRUCCION DEL TEXTO SEMANTICO (VECTOR) ---
-                # AQUI ESTA EL CAMBIO: Hemos quitado "Details: {desc_larga}"
+                # Incluimos la descripción larga limpia para vectorización más profunda
                 texto_vector = (
                     f"Title: {nombre}. "
                     f"Developer: {devs}. "
                     f"Genres: {genres}. "
                     f"Tags: {tags}. "
-                    f"Summary: {desc_corta}"
+                    f"Summary: {desc_corta}. "
+                    f"Details: {desc_larga_limpia}"
                 )
 
                 # --- VECTORIZACION ---

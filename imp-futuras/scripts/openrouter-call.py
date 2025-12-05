@@ -26,11 +26,11 @@ if not OPENROUTER_API_KEY:
     raise ValueError("[ERROR] OPENROUTER_API_KEY no encontrada en .env")
 
 # Configuracion de rendimiento
-# 5 hilos para no saturar el Rate Limit de la API
-MAX_HILOS = 5
+# Elegir menos hilos para no saturar el Rate Limit de la API (max 10)
+MAX_HILOS = 7
 
 # Limite de juegos a procesar (0 = todos)
-CANTIDAD_A_PROCESAR = 100  # Cambia esto al numero que quieras 
+CANTIDAD_A_PROCESAR = 0  # Cambia esto al numero que quieras 
 
 # Inicializar cliente
 client = OpenAI(
@@ -64,6 +64,8 @@ def generar_resumen_ia(juego):
     3. Usa palabras clave específicas.
     4. NO uses frases de marketing ni premios. Ve al grano.
     5. Traduce todo al español si el original está en otro idioma.
+    6. Si detectas que es un paquete de mejora o DLC, indícalo claramente al inicio del resumen.
+    7. Si detectas que es un juego para adultos, indícalo claramente al final del resumen.
     
     RESUMEN:
     """

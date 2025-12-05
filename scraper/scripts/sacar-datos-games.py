@@ -25,7 +25,7 @@ logging.basicConfig(
 )
 
 # 0 = PROCESAR TODOS. Pon un número bajo (ej: 10) para probar.
-CANTIDAD_A_PROCESAR = 25
+CANTIDAD_A_PROCESAR = 0
 
 ARCHIVO_ENTRADA = os.path.join(PROJECT_ROOT, 'data', 'steam-top-games.json')
 ARCHIVO_SALIDA = os.path.join(PROJECT_ROOT, 'data', 'steam-games-data.ndjson') 

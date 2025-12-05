@@ -5,9 +5,13 @@ Pipeline completo de scraping de juegos de Steam con generación automática de 
 ## 🎯 ¿Qué hace este proyecto?
 
 1. **Scraping inteligente**: Descarga datos de ~10,000 juegos de Steam (trending + clásicos populares)
-2. **Vectorización semántica**: Genera embeddings de 768 dimensiones con modelos multilingües para búsqueda por similitud
-3. **Pipeline automatizado**: Orquesta scraping → limpieza → vectorización → sincronización remota
-4. **Sincronización SSH**: Copia automática de datos vectorizados y logs a servidor remoto para ingestión en Elasticsearch/Logstash
+2. **Filtrado automático**: Elimina DLC, soundtracks y contenido adulto (filter-games.py)
+3. **Extracción de descripciones**: Obtiene descripciones detalladas de la Steam API (imp-futuras)
+4. **Resúmenes IA**: Genera resúmenes con OpenRouter GPT-4o-mini (imp-futuras)
+5. **Reemplazo inteligente**: Integra descripciones resumidas en los datos principales (desc-changer.py)
+6. **Vectorización semántica**: Genera embeddings de 768 dimensiones con modelos multilingües para búsqueda por similitud
+7. **Pipeline automatizado**: Orquesta todas las fases → limpieza → vectorización → sincronización remota
+8. **Sincronización SSH**: Copia automática de datos vectorizados y logs a servidor remoto para ingestión en Elasticsearch/Logstash
 
 ## 📁 Estructura del Proyecto
 
@@ -17,16 +21,18 @@ scraper/
 │   ├── run_pipeline.py            # Orquestador principal (scraping → limpieza)
 │   ├── gameid-script.py           # Fase 1: Descarga IDs de juegos populares
 │   ├── sacar-datos-games.py       # Fase 2: Obtiene detalles completos + limpieza HTML
-│   ├── vectorizador.py            # Fase 3: Genera embeddings (modelo all-mpnet-base-v2)
+│   ├── filter-games.py            # Fase 2.5: Filtra DLC, soundtracks y contenido adulto
+│   ├── desc-changer.py            # Fase 3.5: Reemplaza descripciones con resúmenes IA
+│   ├── vectorizador.py            # Fase 4: Genera embeddings (768 dims)
 │   ├── vectorizador2.py           # Alternativa: modelo multilingüe paraphrase-multilingual
 │   └── instalar_modelo.py         # Descargador de modelos SentenceTransformers
 ├── sh_test/                       # Scripts auxiliares de setup
 │   ├── instalar_lib_embeddings.sh # Instala PyTorch CPU + sentence-transformers
 │   └── cp-vects.sh                # Sincronización manual a servidor remoto
 ├── data/                          # Datos generados (ignorados por git)
-│   ├── steam-top-games.json       # ~10k IDs de juegos (salida Fase 1)
-│   ├── steam-games-data.ndjson    # Datos completos sin vectorizar (Fase 2)
-│   └── steam-games-data-vect.ndjson # Datos + embeddings (Fase 3, listo para RAG)
+│   ├── steam-top-games.json       # IDs de juegos filtrados (5,001+)
+│   ├── steam-games-data.ndjson    # Datos completos con descripciones resumidas
+│   └── steam-games-data-vect.ndjson # Datos + embeddings 768-dim (listo para RAG)
 ├── logs/                          # Logs del pipeline (ignorados por git)
 │   ├── scraper_metrics.log        # Logs de gameid-script.py
 │   ├── scraper_full_data_metrics.log # Logs de sacar-datos-games.py
@@ -53,10 +59,12 @@ chmod +x setup.sh
 3. ✅ Instalación de dependencias (`requirements.txt`)
 4. ✅ Instalación de PyTorch CPU + sentence-transformers
 5. ✅ Descarga del modelo de embeddings (paraphrase-multilingual-mpnet-base-v2)
-6. ✅ Ejecución del pipeline completo (scraping + vectorización)
-7. ✅ Sincronización SSH a servidor remoto (`192.199.1.65:/home/g6/reto/datos/`)
-
-**Nota:** Si todo está instalado, solo ejecuta los pasos 6-7 (ideal para cron jobs).
+6. ✅ Scraping de Steam (run_pipeline.py)
+7. ✅ Filtrado de DLC/soundtracks (filter-games.py)
+8. ✅ Extracción de descripciones + resúmenes IA (carpeta imp-futuras)
+9. ✅ Reemplazo de descripciones (desc-changer.py)
+10. ✅ Vectorización semántica (vectorizador.py)
+11. ✅ Sincronización SSH a servidor remoto (`192.199.1.65:/home/g6/reto/datos/`)
 
 ### Instalación manual (paso a paso)
 
@@ -102,7 +110,26 @@ python scripts/sacar-datos-games.py
 # Salida: data/steam-games-data.ndjson (título, descripción, géneros, precio, etc.)
 ```
 
-**Fase 3: Generar embeddings**
+**Fase 2.5: Filtrar DLC, soundtracks y contenido adulto**
+```bash
+python scripts/filter-games.py
+# Entrada: data/steam-top-games.json
+# Salida: data/steam-top-games.json (filtrada, ~5,001 juegos)
+```
+
+**Fase 3: Extracción de descripciones y generación de resúmenes IA**
+```bash
+# Ejecutado desde la carpeta imp-futuras (scripts de extracción + OpenRouter)
+```
+
+**Fase 3.5: Reemplazar descripciones con resúmenes IA**
+```bash
+python scripts/desc-changer.py
+# Entrada: data/steam-games-data.ndjson + resúmenes IA de imp-futuras
+# Salida: data/steam-games-data.ndjson (actualizado con resúmenes)
+```
+
+**Fase 4: Generar embeddings**
 ```bash
 python scripts/vectorizador.py
 # Entrada: data/steam-games-data.ndjson
@@ -118,7 +145,7 @@ Cada juego en `steam-games-data-vect.ndjson` es una línea JSON con:
   "appid": 730,
   "name": "Counter-Strike 2",
   "short_description": "For over two decades...",
-  "detailed_description": "<p>For over two decades...</p>",
+  "detailed_description": "Counter-Strike 2 es un videojuego de disparos competitivo...",
   "genres": ["Action", "FPS"],
   "categories": ["Multi-player", "Online PvP"],
   "developers": ["Valve"],
@@ -129,11 +156,19 @@ Cada juego en `steam-games-data-vect.ndjson` es una línea JSON con:
 
 **Campo clave:** `vector_embedding` → Vector de 768 dimensiones para búsqueda semántica en Elasticsearch con modelo dense_vector.
 
+**Nota:** `detailed_description` ahora contiene un resumen IA generado con OpenRouter GPT-4o-mini (más conciso que la descripción original).
+
 ## 🔧 Configuración
 
 ### Ajustar cantidad de juegos
 - `scripts/gameid-script.py` → `CANTIDAD_POR_CRITERIO = 5000` (IDs por criterio)
 - `scripts/sacar-datos-games.py` → `CANTIDAD_A_PROCESAR = 25` (0 = todos)
+
+### Palabras clave para filtrado
+Edita `scripts/filter-games.py` para cambiar qué se filtra (DLC, soundtracks, etc.)
+
+### Configurar resúmenes IA
+Configura la API key de OpenRouter en `/home/g6/reto/imp-futuras/.env` para activar generación automática de resúmenes
 
 ### Cambiar modelo de embeddings
 Edita `scripts/instalar_modelo.py` y `scripts/vectorizador.py`:
@@ -189,6 +224,7 @@ O ejecuta el setup completo (verifica instalaciones + ejecuta pipeline):
 - **Embeddings**: `sentence-transformers` (HuggingFace)
 - **Modelo**: `paraphrase-multilingual-mpnet-base-v2` (278M parámetros, 768 dims)
 - **Backend ML**: PyTorch (CPU-only)
+- **Resúmenes IA**: OpenRouter (GPT-4o-mini) con parallelización
 - **Formato de datos**: NDJSON (compatible con Filebeat/Logstash/Elasticsearch)
 
 
