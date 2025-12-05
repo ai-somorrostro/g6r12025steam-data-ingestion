@@ -226,6 +226,3 @@ O ejecuta el setup completo (verifica instalaciones + ejecuta pipeline):
 - **Backend ML**: PyTorch (CPU-only)
 - **Resúmenes IA**: OpenRouter (GPT-4o-mini) con parallelización
 - **Formato de datos**: NDJSON (compatible con Filebeat/Logstash/Elasticsearch)
-
-
-.
