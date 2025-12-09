@@ -11,7 +11,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 # Configuración de archivos
 ARCHIVO_ENTRADA = os.path.join(PROJECT_ROOT, 'scraper', 'data', 'steam-top-games.json')
 ARCHIVO_SALIDA = os.path.join(PROJECT_ROOT, 'scraper', 'data', 'steam-top-games-filtered.json')
-ARCHIVO_BACKUP = os.path.join(PROJECT_ROOT, 'scraper', 'data', 'steam-top-games-backup.json')
+ARCHIVO_BACKUP = os.path.join(PROJECT_ROOT, 'scraper', 'backups', 'steam-top-games-backup.json')
 
 # ==========================================
 # PALABRAS CLAVE A FILTRAR
@@ -25,11 +25,9 @@ PALABRAS_CLAVE_FILTRO = [
     "expansion",
     "cosmetic",
     "cosmetics",
-    "demo",
     "bundle",
     "bundle pack",
     "season pass",
-    "pass",
     "adult",
     "sexual",
     "xxx",

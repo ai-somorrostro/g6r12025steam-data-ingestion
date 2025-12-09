@@ -11,13 +11,13 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 # Configuración de archivos
 ARCHIVO_STEAM = os.path.join(PROJECT_ROOT, 'scraper', 'data', 'steam-top-games.json')
 ARCHIVO_RAW = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'raw-desc.ndjson')
-ARCHIVO_RAW_BACKUP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'raw-desc-backup.ndjson')
+ARCHIVO_RAW_BACKUP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backup', 'raw-desc-backup.ndjson')
 
 def main():
     print(f"[*] SINCRONIZANDO IDs ENTRE ARCHIVOS")
     print(f"[*] Steam IDs desde: {ARCHIVO_STEAM}")
     print(f"[*] Raw descriptions: {ARCHIVO_RAW}")
-    
+    print(f"[*] Backup de raw descriptions: {ARCHIVO_RAW_BACKUP}")
     # Verificar que existen los archivos
     if not os.path.exists(ARCHIVO_STEAM):
         print(f"[ERROR] No se encuentra '{ARCHIVO_STEAM}'")

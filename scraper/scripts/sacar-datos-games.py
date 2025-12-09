@@ -33,10 +33,73 @@ ARCHIVO_SALIDA = os.path.join(PROJECT_ROOT, 'data', 'steam-games-data.ndjson')
 URL_DETALLES = "https://store.steampowered.com/api/appdetails/"
 PARAMS_BASE = {"cc": "es", "l": "spanish"}
 DELAY = 1.3 
+URL_STORE_PAGE = "https://store.steampowered.com/app/{appid}/?l=spanish&cc=es"
 
 # =================================================================
-# 2. FUNCIONES DE LIMPIEZA (HTML)
+# 2. FUNCIONES DE SINCRONIZACIÓN
 # =================================================================
+def cargar_ids_desde_ndjson(filepath):
+    """Carga todos los IDs del archivo NDJSON existente."""
+    ids = set()
+    if not os.path.exists(filepath):
+        return ids
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            for linea in f:
+                if linea.strip():
+                    doc = json.loads(linea)
+                    ids.add(doc.get('steam_id'))
+    except Exception as e:
+        logging.error(f"Error al cargar IDs desde NDJSON: {e}")
+    
+    return ids
+
+def sincronizar_datos(lista_entrada, archivo_salida):
+    """
+    Sincroniza los datos:
+    1. Si no existe archivo_salida: procesar todos
+    2. Si existe: elimina obsoletos, reprocesa todo para actualizar precios
+    
+    Retorna: lista de IDs a procesar
+    """
+    ids_nuevos = set(juego.get('appid') for juego in lista_entrada)
+    ids_existentes = cargar_ids_desde_ndjson(archivo_salida)
+    ids_a_eliminar = ids_existentes - ids_nuevos
+    
+    print(f"\n[SINCRONIZACIÓN]")
+    print(f"  Total IDs en steam-top-games.json: {len(ids_nuevos)}")
+    print(f"  Total IDs en steam-games-data.ndjson: {len(ids_existentes)}")
+    print(f"  IDs a reprocesar (actualizar precios): {len(ids_nuevos)}")
+    print(f"  IDs obsoletos a eliminar: {len(ids_a_eliminar)}")
+    print()
+    
+    # Eliminar obsoletos si existen
+    if len(ids_a_eliminar) > 0:
+        print(f"[*] Eliminando {len(ids_a_eliminar)} registros obsoletos...")
+        datos_validos = []
+        try:
+            with open(archivo_salida, 'r', encoding='utf-8') as f:
+                for linea in f:
+                    if linea.strip():
+                        doc = json.loads(linea)
+                        if doc.get('steam_id') in ids_nuevos:
+                            datos_validos.append(doc)
+        except Exception as e:
+            logging.error(f"Error al leer datos: {e}")
+        
+        with open(archivo_salida, 'w', encoding='utf-8') as f:
+            for doc in datos_validos:
+                f.write(json.dumps(doc, ensure_ascii=False) + "\n")
+        
+        logging.info(f"SINCRONIZACIÓN | Eliminados:{len(ids_a_eliminar)} | A reprocesar:{len(ids_nuevos)}")
+    else:
+        # Vaciar archivo para reprocesar todo
+        if os.path.exists(archivo_salida):
+            with open(archivo_salida, 'w', encoding='utf-8') as f:
+                pass
+    
+    return list(ids_nuevos)
 def limpiar_html_respetando_utf8(texto):
     """
     Elimina las etiquetas HTML
@@ -55,6 +118,35 @@ def limpiar_html_respetando_utf8(texto):
     # 4. Eliminar espacios dobles o triples que hayan quedado
     return " ".join(texto_limpio.split())
 
+def extraer_tags_populares(html, max_tags=10):
+    try:
+        crudos = re.findall(r'class="app_tag"[^>]*>([^<]+)<', html, flags=re.IGNORECASE | re.DOTALL)
+        tags = []
+        vistos = set()
+        for bruto in crudos:
+            tag = bruto.strip()
+            if not tag or tag == "+":
+                continue
+            if tag not in vistos:
+                vistos.add(tag)
+                tags.append(tag)
+            if len(tags) >= max_tags:
+                break
+        return tags
+    except Exception as e:
+        logging.warning(f"Error al extraer tags populares: {e}")
+        return []
+
+def obtener_tags_populares(appid):
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(URL_STORE_PAGE.format(appid=appid), headers=headers, timeout=10)
+        if resp.status_code == 200:
+            return extraer_tags_populares(resp.text)
+        logging.warning(f"Fallo al pedir tags populares {appid}: status {resp.status_code}")
+    except Exception as e:
+        logging.warning(f"Excepcion al pedir tags populares {appid}: {e}")
+    return []
 def normalizar_fecha(fecha_texto):
     if not fecha_texto: return None
     meses = {
@@ -99,7 +191,9 @@ def procesar_juego_elk(appid, data):
     
     # --- LISTAS ---
     genres = [g['description'] for g in data.get('genres', [])]
-    categories = [c['description'] for c in data.get('categories', [])]
+    categories_raw = [c['description'] for c in data.get('categories', [])]
+    categories_populares = obtener_tags_populares(appid)
+    categories = categories_populares if categories_populares else categories_raw
     devs = data.get('developers', [])
     pubs = data.get('publishers', [])
     
@@ -157,6 +251,11 @@ def main():
         
     with open(ARCHIVO_ENTRADA, 'r', encoding='utf-8') as f:
         lista = json.load(f)
+
+    # SINCRONIZAR: eliminar obsoletos y reprocesar todo
+    print("\n[SINCRONIZACIÓN DE DATOS]")
+    ids_a_procesar = sincronizar_datos(lista, ARCHIVO_SALIDA)
+    lista = [j for j in lista if j.get('appid') in ids_a_procesar]
 
     if CANTIDAD_A_PROCESAR > 0: 
         lista = lista[:CANTIDAD_A_PROCESAR]

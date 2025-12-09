@@ -5,6 +5,12 @@ echo "   Instalador de dependencias - Steam Scraper"
 echo "=========================================="
 echo ""
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SCRAPER_DIR="${ROOT_DIR}/scraper"
+
+cd "$SCRAPER_DIR"
+
 # Función para registrar fallo y salir
 log_fail() {
     mkdir -p logs
@@ -14,7 +20,7 @@ log_fail() {
     exit 1
 }
 
-# Verificar que Python está instalado
+# 1. Verificar que Python está instalado
 if ! command -v python3 &> /dev/null; then
     echo "[ERROR] Python3 no está instalado."
     echo "[INFO] Instala Python3 antes de ejecutar este script:"
@@ -29,7 +35,7 @@ fi
 echo "[INFO] Python encontrado: $(python3 --version)"
 echo ""
 
-# Verificar que venv está disponible
+# 2. Verificar que venv está disponible
 echo "[*] Verificando módulo venv..."
 if ! python3 -m venv --help &> /dev/null; then
     echo "[WARN] El módulo venv no está instalado"
@@ -59,40 +65,47 @@ else
 fi
 echo ""
 
-# Crear entorno virtual si no existe
-if [ ! -d ".venv" ]; then
-    echo "[*] Creando entorno virtual..."
-    python3 -m venv .venv || log_fail "Fallo creando entorno virtual (.venv)"
-    echo "[OK] Entorno virtual creado"
+# 3. Usar entorno virtual global unificado
+VENV_GLOBAL="/home/g6/.venv"
+
+if [ ! -d "$VENV_GLOBAL" ]; then
+    echo "[*] Creando entorno virtual global en $VENV_GLOBAL..."
+    python3 -m venv "$VENV_GLOBAL" || log_fail "Fallo creando entorno virtual global"
+    echo "[OK] Entorno virtual global creado"
 else
-    echo "[INFO] Entorno virtual ya existe"
+    echo "[INFO] Entorno virtual global ya existe en $VENV_GLOBAL"
 fi
 
 echo ""
 
-# Activar entorno virtual
-echo "[*] Activando entorno virtual..."
-source .venv/bin/activate || log_fail "No se pudo activar el entorno virtual"
+
+# 4. Activar entorno virtual global
+echo "[*] Activando entorno virtual global..."
+source "$VENV_GLOBAL/bin/activate" || log_fail "No se pudo activar el entorno virtual global"
 
 echo ""
 
-# Instalar dependencias
+
+# 5. Instalar dependencias base
 echo "[*] Instalando dependencias desde requirements.txt..."
 pip install --upgrade pip || log_fail "Fallo actualizando pip"
 pip install -r requirements.txt || log_fail "Fallo instalando requirements"
 
 echo ""
-# Instalar librería de embeddings (torch CPU-only) desde script dedicado
-if [ -f "sh_test/instalar_lib_embeddings.sh" ]; then
-    echo "[*] Instalando librería de embeddings (torch CPU)"
-    bash sh_test/instalar_lib_embeddings.sh || log_fail "Fallo instalando librería de embeddings (torch CPU)"
-    echo "[OK] Librería de embeddings instalada."
+
+
+# 6. Verificar librerías de embeddings (ya instaladas con requirements.txt)
+echo "[*] Verificando torch y sentence-transformers..."
+if python -c "import torch, sentence_transformers" 2>/dev/null; then
+    echo "[OK] Librerías de embeddings disponibles."
 else
-    echo "[INFO] No se encontró 'sh_test/instalar_lib_embeddings.sh'. Saltando instalación de embeddings."
+    log_fail "Torch o sentence-transformers no disponibles tras instalar requirements"
 fi
 
 echo ""
-# Descargar modelo de embeddings (con verificación de caché)
+
+
+# 7. Descargar modelo de embeddings (con verificación de caché)
 if [ -f "scripts/instalar_modelo.py" ]; then
     echo "[*] Verificando/descargando modelo de embeddings..."
     python scripts/instalar_modelo.py
@@ -114,38 +127,61 @@ echo "[OK] Instalación completada"
 echo "=========================================="
 echo ""
 
-# Crear carpetas necesarias
+
+
+# 8. Crear carpetas necesarias
 echo "[*] Verificando carpetas necesarias..."
 mkdir -p data logs
 echo "[OK] Carpetas verificadas"
 echo ""
 
-# Ejecutar el script principal
+
+
+# 9. Ejecutar scraping de Steam API
 echo "[*] Ejecutando run_pipeline.py..."
 echo ""
 python scripts/run_pipeline.py || log_fail "Fallo ejecutando run_pipeline.py"
 
 
+# 9.5. Filtrar juegos (DLC, soundtracks, contenido adulto)
+echo ""
+echo "[*] Ejecutando filter-games.py para filtrar juegos irrelevantes..."
+echo ""
+python scripts/filter-games.py || log_fail "Fallo ejecutando filter-games.py"
 
+
+# 10. Ejecutar pipeline de extracción y resumen IA
+echo ""
+echo "[*] Ejecutando pipeline de extracción y resumen (flux.sh)..."
+echo ""
+bash "${ROOT_DIR}/imp-futuras/flux.sh" || log_fail "Fallo ejecutando flux.sh"
+
+
+# 11. Reemplazar descripciones con resúmenes IA
+echo ""
+echo "[*] Ejecutando desc-changer.py para reemplazar descripciones..."
+echo ""
+python "${SCRAPER_DIR}/scripts/desc-changer.py" || log_fail "Fallo ejecutando desc-changer.py"
+
+
+# 12. Limpiar categorías irrelevantes (Steam metadata)
+echo ""
+echo "[*] Ejecutando clean-tags.py para limpiar categorías irrelevantes..."
+echo ""
+python scripts/clean-tags.py || log_fail "Fallo ejecutando clean-tags.py"
+
+
+# 13. Generar embeddings semánticos (768 dims)
 echo ""
 echo "[*] Ejecutando vectorizador.py..."
 echo ""
 python scripts/vectorizador.py || log_fail "Fallo ejecutando vectorizador.py"
+echo ""
 
-echo ""
-echo "[*] Ejecutando pipeline de extracción y resumen (flux.sh)..."
-echo ""
-bash /home/g6/reto/imp-futuras/flux.sh || log_fail "Fallo ejecutando flux.sh"
 
-echo ""
-echo "[*] Ejecutando desc-changer.py para reemplazar descripciones..."
-echo ""
-python /home/g6/reto/scraper/scripts/desc-changer.py || log_fail "Fallo ejecutando desc-changer.py"
-
-echo ""
-# Sincronizar datos vectorizados a máquina remota
-ARCHIVO_VECT="data/steam-games-data-vect.ndjson"
-LOG_METRICS="logs/scraper_metrics.log"
+# 14. Sincronizar datos vectorizados a máquina remota
+ARCHIVO_VECT="${SCRAPER_DIR}/data/steam-games-data-vect.ndjson"
+LOG_METRICS="${SCRAPER_DIR}/logs/scraper_metrics.log"
 MAQUINA_REMOTA="192.199.1.65"
 RUTA_REMOTA="/home/g6/reto/datos"
 
@@ -157,6 +193,7 @@ else
     echo "[WARN] No se encontró el archivo vectorizado. Saltando sincronización."
 fi
 
+# 15. Sincronizar logs a máquina remota
 if [ -f "$LOG_METRICS" ]; then
     echo "[*] Copiando log de métricas a $MAQUINA_REMOTA:$RUTA_REMOTA ..."
     scp "$LOG_METRICS" "$MAQUINA_REMOTA:$RUTA_REMOTA/" || log_fail "Fallo copiando log a máquina remota"

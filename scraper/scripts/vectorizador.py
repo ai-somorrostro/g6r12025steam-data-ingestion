@@ -50,8 +50,6 @@ def procesar_pipeline():
                 nombre = juego.get('name') or "Sin Nombre"
                 genres = ", ".join((juego.get('genres') or [])[:5])
                 tags = ", ".join((juego.get('categories') or [])[:10])
-                devs = ", ".join((juego.get('developers') or [])[:3])
-                desc_corta = juego.get('short_description') or ""
                 
                 # 1. LIMPIEZA DE LA DESCRIPCION LARGA (Para el JSON final)
                 # La limpiamos para que OpenRouter no lea HTML basura, pero NO la metemos al vector.
@@ -59,13 +57,11 @@ def procesar_pipeline():
                 juego['detailed_description'] = desc_larga_limpia # Actualizamos el objeto original
 
                 # --- CONSTRUCCION DEL TEXTO SEMANTICO (VECTOR) ---
-                # Incluimos la descripción larga limpia para vectorización más profunda
+                # Solo: Título, Géneros, Tags y Descripción IA (sin developer ni short_description)
                 texto_vector = (
                     f"Title: {nombre}. "
-                    f"Developer: {devs}. "
                     f"Genres: {genres}. "
                     f"Tags: {tags}. "
-                    f"Summary: {desc_corta}. "
                     f"Details: {desc_larga_limpia}"
                 )
 

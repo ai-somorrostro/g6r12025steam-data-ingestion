@@ -50,22 +50,30 @@ def generar_resumen_ia(juego):
     descripcion_larga = juego.get('detailed_description', '')
     if not descripcion_larga.strip():
         return None
+    
+    # Extraer géneros y categorías
+    genres = juego.get('genres', [])
+    categories = juego.get('categories', [])
+    genres_str = ', '.join(genres) if genres else 'N/A'
+    categories_str = ', '.join(categories) if categories else 'N/A'
+    
     prompt = f"""
     Actúa como un experto en catalogación de videojuegos.
     Tu tarea es generar un resumen técnico y denso en ESPAÑOL (Castellano) para ser usado en un motor de búsqueda semántico.
     
     INPUT:
     - Juego: {nombre}
+    - Géneros: {genres_str}
+    - Categorías: {categories_str}
     - Texto original: {descripcion_larga}
     
     INSTRUCCIONES DE SALIDA:
     1. Escribe un párrafo de máximo 3 o 4 líneas.
-    2. Céntrate OBLIGATORIAMENTE en: Género, Ambientación, Mecánicas principales y Tono.
-    3. Usa palabras clave específicas.
+    2. Céntrate OBLIGATORIAMENTE en: Género, Ambientación, Mecánicas principales y Tono (usa los géneros y categorías como referencia).
+    3. Usa palabras clave específicas del juego.
     4. NO uses frases de marketing ni premios. Ve al grano.
     5. Traduce todo al español si el original está en otro idioma.
     6. Si detectas que es un paquete de mejora o DLC, indícalo claramente al inicio del resumen.
-    7. Si detectas que es un juego para adultos, indícalo claramente al final del resumen.
     
     RESUMEN:
     """

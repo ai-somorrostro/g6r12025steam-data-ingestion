@@ -5,7 +5,7 @@
 set -e  # Salir si algún comando falla
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_DIR="$SCRIPT_DIR/venv"
+VENV_GLOBAL="/home/g6/.venv"
 REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
 
 echo "=========================================="
@@ -13,16 +13,16 @@ echo "INICIANDO PIPELINE DE DATOS"
 echo "=========================================="
 echo ""
 
-# Verificar/crear entorno virtual
-if [ ! -d "$VENV_DIR" ]; then
-    echo "[INFO] Creando entorno virtual..."
-    python3 -m venv "$VENV_DIR"
-    echo "[OK] Entorno virtual creado"
+# Verificar/crear entorno virtual global (unificado con scraper)
+if [ ! -d "$VENV_GLOBAL" ]; then
+    echo "[INFO] Creando entorno virtual global en $VENV_GLOBAL..."
+    python3 -m venv "$VENV_GLOBAL"
+    echo "[OK] Entorno virtual global creado"
 fi
 
-# Activar el entorno virtual
-echo "[INFO] Activando entorno virtual..."
-source "$VENV_DIR/bin/activate"
+# Activar el entorno virtual global
+echo "[INFO] Activando entorno virtual global ($VENV_GLOBAL)..."
+source "$VENV_GLOBAL/bin/activate"
 
 # Instalar/actualizar dependencias
 if [ -f "$REQUIREMENTS" ]; then
