@@ -37,9 +37,8 @@ scraper/
 │   ├── scraper_metrics.log        # Logs de gameid-script.py
 │   ├── scraper_full_data_metrics.log # Logs de sacar-datos-games.py
 │   └── setup_fail.log             # Registro de fallos del instalador
-├── .venv/                         # Entorno virtual Python
 ├── setup.sh                       # Instalador completo Linux/Mac (ejecuta pipeline)
-├── requirements.txt               # Dependencias base (requests, beautifulsoup4, etc.)
+├── requirements.txt               # Dependencias (requests, beautifulsoup4, torch CPU, sentence-transformers, openai, etc.)
 ├── .gitignore                     # Ignora data/, logs/, .venv/, caches
 └── README.md                      # Este archivo
 ```
@@ -54,42 +53,56 @@ chmod +x setup.sh
 ```
 
 **El script `setup.sh` ejecuta automáticamente:**
-1. ✅ Verificación de Python3 y venv
-2. ✅ Creación de `.venv/` y activación
-3. ✅ Instalación de dependencias (`requirements.txt`)
-4. ✅ Instalación de PyTorch CPU + sentence-transformers
-5. ✅ Descarga del modelo de embeddings (paraphrase-multilingual-mpnet-base-v2)
-6. ✅ Scraping de Steam (run_pipeline.py)
-7. ✅ Filtrado de DLC/soundtracks (filter-games.py)
-8. ✅ Extracción de descripciones + resúmenes IA (carpeta imp-futuras)
-9. ✅ Reemplazo de descripciones (desc-changer.py)
-10. ✅ Vectorización semántica (vectorizador.py)
-11. ✅ Sincronización SSH a servidor remoto (`192.199.1.65:/home/g6/reto/datos/`)
+1. ✅ Verificación de Python3 disponible
+2. ✅ **Uso del venv global unificado** (`/home/g6/.venv`) - compartido con imp-futuras
+3. ✅ Instalación de dependencias desde `requirements.txt` (torch CPU, sentence-transformers, openai)
+4. ✅ Verificación de PyTorch CPU + sentence-transformers mediante import check
+5. ✅ Descarga del modelo de embeddings (paraphrase-multilingual-mpnet-base-v2, con verificación de caché en `~/.cache/huggingface/`)
+6. ✅ **Sincronización de datos con Elasticsearch** (fase nueva)
+7. ✅ Scraping de Steam (run_pipeline.py)
+8. ✅ Filtrado de DLC/soundtracks (filter-games.py)
+9. ✅ Limpieza de categorías Steam (clean-tags.py)
+10. ✅ Extracción de descripciones + resúmenes IA (flux.sh en imp-futuras)
+11. ✅ Reemplazo de descripciones (desc-changer.py)
+12. ✅ Vectorización semántica (vectorizador.py)
+13. ✅ **Sincronización incremental de datos** (cargar IDs existentes, eliminar obsoletos, reprocesar válidos)
+14. ✅ Sincronización SSH a servidor remoto con validación de directorio (`192.199.1.65:/home/g6/reto/datos/`)
 
 ### Instalación manual (paso a paso)
 
 Si prefieres instalar manualmente:
 
 ```bash
-# 1. Crear entorno virtual
-python3 -m venv .venv
-source .venv/bin/activate
+# 1. Usar entorno virtual global (crear si no existe)
+python3 -m venv /home/g6/.venv
+source /home/g6/.venv/bin/activate
 
-# 2. Instalar dependencias base
+# 2. Instalar dependencias (incluye torch CPU, sentence-transformers, openai)
+cd /home/g6/reto/scraper
 pip install -r requirements.txt
 
-# 3. Instalar librerías de embeddings (PyTorch CPU + SentenceTransformers)
-bash sh_test/instalar_lib_embeddings.sh
+# 3. Verificar instalación de librerías críticas
+python -c "import torch, sentence_transformers, openai; print('✅ OK')"
 
-# 4. Descargar modelo de embeddings
+# 4. Descargar modelo de embeddings (si no está en caché)
 python scripts/instalar_modelo.py
+```
+
+### Actualización de un entorno existente
+
+Si ya tienes `/home/g6/.venv` pero necesitas actualizar dependencias:
+
+```bash
+source /home/g6/.venv/bin/activate
+cd /home/g6/reto/scraper
+pip install --upgrade -r requirements.txt
 ```
 
 ## ▶️ Ejecución del Pipeline
 
 ### Ejecución completa (recomendado)
 ```bash
-source .venv/bin/activate
+source /home/g6/.venv/bin/activate
 python scripts/run_pipeline.py  # Scraping + limpieza
 python scripts/vectorizador.py  # Generación de embeddings
 bash sh_test/cp-vects.sh        # Sincronización remota (opcional)
@@ -108,6 +121,12 @@ python scripts/gameid-script.py
 python scripts/sacar-datos-games.py
 # Entrada: data/steam-top-games.json
 # Salida: data/steam-games-data.ndjson (título, descripción, géneros, precio, etc.)
+# 
+# Cambios recientes:
+# - Sincronización incremental: Compara IDs con archivo NDJSON existente
+# - Elimina juegos obsoletos (ya no en top games)
+# - Reprocesa todos los válidos para actualizar precios/métricas
+# - Log de cambios: "SINCRONIZACIÓN | Eliminados:X | A reprocesar:Y"
 ```
 
 **Fase 2.5: Filtrar DLC, soundtracks y contenido adulto**
@@ -160,9 +179,53 @@ Cada juego en `steam-games-data-vect.ndjson` es una línea JSON con:
 
 ## 🔧 Configuración
 
+### Entorno Virtual Global
+
+El proyecto utiliza un **venv unificado** en `/home/g6/.venv` compartido entre `scraper` e `imp-futuras`:
+
+```bash
+# Activar siempre desde aquí
+source /home/g6/.venv/bin/activate
+
+# Localización de binarios Python
+/home/g6/.venv/bin/python
+/home/g6/.venv/bin/pip
+
+# Caché de modelos HuggingFace
+~/.cache/huggingface/hub/  # (descargado automáticamente)
+```
+
+**Ventajas:**
+- ✅ Una única instalación de librerías pesadas (torch, transformers)
+- ✅ Ahorra ~3-4 GB de espacio en disco
+- ✅ Coherencia en versiones entre scraper e API
+- ✅ Facilita mantenimiento centralizado
+
+### Sincronización Incremental de Datos
+
+El script `sacar-datos-games.py` implementa sincronización inteligente:
+
+```python
+# Fase automática en cada ejecución:
+1. cargar_ids_desde_ndjson()
+   - Lee IDs existentes en steam-games-data.ndjson
+   - Retorna set de IDs para comparación
+
+2. sincronizar_datos(lista_entrada, archivo_salida)
+   - Compara IDs nuevos vs existentes
+   - Elimina registros de juegos que bajaron del top
+   - Reprocesa TODO juegos válidos (actualizar precios/métricas)
+   - Log de cambios realizados
+
+# Resultado:
+- Archivo NDJSON siempre contiene juegos del top actual
+- Precios siempre actualizados (ninguno es saltado)
+- Juegos obsoletos eliminados automáticamente
+```
+
 ### Ajustar cantidad de juegos
 - `scripts/gameid-script.py` → `CANTIDAD_POR_CRITERIO = 5000` (IDs por criterio)
-- `scripts/sacar-datos-games.py` → `CANTIDAD_A_PROCESAR = 25` (0 = todos)
+- `scripts/sacar-datos-games.py` → `CANTIDAD_A_PROCESAR = 0` (0 = todos, cambiar a X para pruebas)
 
 ### Palabras clave para filtrado
 Edita `scripts/filter-games.py` para cambiar qué se filtra (DLC, soundtracks, etc.)
@@ -175,7 +238,7 @@ Edita `scripts/instalar_modelo.py` y `scripts/vectorizador.py`:
 ```python
 # Opciones:
 # - 'all-mpnet-base-v2' (inglés, 768 dims)
-# - 'paraphrase-multilingual-mpnet-base-v2' (multilingüe, 768 dims)
+# - 'paraphrase-multilingual-mpnet-base-v2' (multilingüe, 768 dims) ← ACTUAL
 # - 'all-MiniLM-L6-v2' (inglés, 384 dims, más rápido)
 MODEL_NAME = 'paraphrase-multilingual-mpnet-base-v2'
 ```
@@ -196,7 +259,7 @@ crontab -e
 
 Añade:
 ```cron
-0 2 * * * cd /home/g6/reto/scraper && /home/g6/reto/scraper/.venv/bin/python scripts/run_pipeline.py >> /home/g6/reto/scraper/logs/cron.log 2>&1 && /home/g6/reto/scraper/.venv/bin/python scripts/vectorizador.py >> /home/g6/reto/scraper/logs/cron.log 2>&1
+0 2 * * * cd /home/g6/reto/scraper && /home/g6/.venv/bin/python scripts/run_pipeline.py >> /home/g6/reto/scraper/logs/cron.log 2>&1 && /home/g6/.venv/bin/python scripts/vectorizador.py >> /home/g6/reto/scraper/logs/cron.log 2>&1
 ```
 
 O ejecuta el setup completo (verifica instalaciones + ejecuta pipeline):
@@ -214,9 +277,33 @@ O ejecuta el setup completo (verifica instalaciones + ejecuta pipeline):
 ## 🔒 Seguridad y Requisitos
 
 - **SSH sin contraseña** requerido para sincronización remota (usa `ssh-copy-id 192.199.1.65`)
-- **Espacio en disco**: ~4-5 GB (modelo + datos + cache pip/huggingface)
-- **Python 3.8+** requerido
-- **Librerías CPU-only**: PyTorch sin CUDA para ahorrar espacio (~2 GB menos que versión GPU)
+- **Espacio en disco**: ~5-6 GB (venv global 2GB + modelo 470MB + datos 2-3GB)
+- **Python 3.8+** requerido (testeado con Python 3.12.3)
+- **Venv global**: `/home/g6/.venv` **obligatorio** - compartido entre scraper e imp-futuras
+- **Librerías CPU-only**: PyTorch sin CUDA para ahorrar espacio (~4 GB menos que versión GPU)
+- **Modelos en caché**: `~/.cache/huggingface/hub/` se crea automáticamente (~470MB)
+
+## 📊 Cambios Recientes (Diciembre 2025)
+
+### Setup.sh
+- ✅ Eliminada llamada a `instalar_lib_embeddings.sh` (path issue)
+- ✅ Verificación simplificada de torch/transformers mediante import check
+- ✅ Removed skip conditions → siempre ejecuta pipeline completo
+- ✅ Venv global obligatorio: `/home/g6/.venv`
+
+### sacar-datos-games.py
+- ✅ **Nueva función**: `cargar_ids_desde_ndjson()` - carga IDs existentes
+- ✅ **Nueva función**: `sincronizar_datos()` - compara, elimina obsoletos, reprocesa todos válidos
+- ✅ Log de sincronización: "SINCRONIZACIÓN | Eliminados:X | A reprocesar:Y"
+- ✅ Automatización: sincronización ejecutada antes del loop de scraping
+
+### Sincronización de Datos
+- **Antes**: Todos los juegos se descargaban/procesaban sin importar si existían
+- **Ahora**: 
+  - Compara IDs entre archivo nuevo vs existente
+  - **Elimina** registros de juegos que bajaron del top
+  - **Reprocesa** todos los válidos (sin saltarse ninguno)
+  - Mantiene datos siempre frescos (precios actualizados)
 
 ## 🛠️ Tecnologías
 
@@ -226,6 +313,3 @@ O ejecuta el setup completo (verifica instalaciones + ejecuta pipeline):
 - **Backend ML**: PyTorch (CPU-only)
 - **Resúmenes IA**: OpenRouter (GPT-4o-mini) con parallelización
 - **Formato de datos**: NDJSON (compatible con Filebeat/Logstash/Elasticsearch)
-
-
-.
