@@ -1,2 +1,8 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 requests==2.31.0
 beautifulsoup4==4.12.3
+sentence-transformers==5.1.2
+torch==2.9.1+cpu
+openai==2.9.0
+python-dotenv==1.2.1

@@ -26,11 +26,11 @@ if not OPENROUTER_API_KEY:
     raise ValueError("[ERROR] OPENROUTER_API_KEY no encontrada en .env")
 
 # Configuracion de rendimiento
-# 5 hilos para no saturar el Rate Limit de la API
-MAX_HILOS = 5
+# Elegir menos hilos para no saturar el Rate Limit de la API (max 10)
+MAX_HILOS = 7
 
 # Limite de juegos a procesar (0 = todos)
-CANTIDAD_A_PROCESAR = 100  # Cambia esto al numero que quieras 
+CANTIDAD_A_PROCESAR = 0  # Cambia esto al numero que quieras 
 
 # Inicializar cliente
 client = OpenAI(
@@ -50,20 +50,30 @@ def generar_resumen_ia(juego):
     descripcion_larga = juego.get('detailed_description', '')
     if not descripcion_larga.strip():
         return None
+    
+    # Extraer géneros y categorías
+    genres = juego.get('genres', [])
+    categories = juego.get('categories', [])
+    genres_str = ', '.join(genres) if genres else 'N/A'
+    categories_str = ', '.join(categories) if categories else 'N/A'
+    
     prompt = f"""
     Actúa como un experto en catalogación de videojuegos.
     Tu tarea es generar un resumen técnico y denso en ESPAÑOL (Castellano) para ser usado en un motor de búsqueda semántico.
     
     INPUT:
     - Juego: {nombre}
+    - Géneros: {genres_str}
+    - Categorías: {categories_str}
     - Texto original: {descripcion_larga}
     
     INSTRUCCIONES DE SALIDA:
     1. Escribe un párrafo de máximo 3 o 4 líneas.
-    2. Céntrate OBLIGATORIAMENTE en: Género, Ambientación, Mecánicas principales y Tono.
-    3. Usa palabras clave específicas.
+    2. Céntrate OBLIGATORIAMENTE en: Género, Ambientación, Mecánicas principales y Tono (usa los géneros y categorías como referencia).
+    3. Usa palabras clave específicas del juego.
     4. NO uses frases de marketing ni premios. Ve al grano.
     5. Traduce todo al español si el original está en otro idioma.
+    6. Si detectas que es un paquete de mejora o DLC, indícalo claramente al inicio del resumen.
     
     RESUMEN:
     """
