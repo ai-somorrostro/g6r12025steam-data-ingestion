@@ -4,7 +4,7 @@ Pipeline completo de scraping de juegos de Steam con generación automática de 
 
 ## 🎯 ¿Qué hace este proyecto?
 
-1. **Scraping inteligente**: Descarga datos de ~10,000 juegos de Steam (trending + clásicos populares)
+1. **Scraping inteligente**: Descarga datos de ~5,000 juegos de Steam (trending + clásicos populares)
 2. **Filtrado automático**: Elimina DLC, soundtracks y contenido adulto (filter-games.py)
 3. **Extracción de descripciones**: Obtiene descripciones detalladas de la Steam API (imp-futuras)
 4. **Resúmenes IA**: Genera resúmenes con OpenRouter GPT-4o-mini (imp-futuras)
@@ -20,24 +20,25 @@ scraper/
 ├── scripts/                       # Scripts del pipeline
 │   ├── run_pipeline.py            # Orquestador principal (scraping → limpieza)
 │   ├── gameid-script.py           # Fase 1: Descarga IDs de juegos populares
-│   ├── sacar-datos-games.py       # Fase 2: Obtiene detalles completos + limpieza HTML
+│   ├── sacar-datos-games.py       # Fase 2: Obtiene detalles completos (identificador de IDs ya procesados) + limpieza HTML
 │   ├── filter-games.py            # Fase 2.5: Filtra DLC, soundtracks y contenido adulto
+│   ├── clean-tags.py              # Fase 3: Limpia categorías/tags irrelevantes
 │   ├── desc-changer.py            # Fase 3.5: Reemplaza descripciones con resúmenes IA
 │   ├── vectorizador.py            # Fase 4: Genera embeddings (768 dims)
-│   ├── vectorizador2.py           # Alternativa: modelo multilingüe paraphrase-multilingual
 │   └── instalar_modelo.py         # Descargador de modelos SentenceTransformers
-├── sh_test/                       # Scripts auxiliares de setup
-│   ├── instalar_lib_embeddings.sh # Instala PyTorch CPU + sentence-transformers
+├── sh_test/                       # Scripts auxiliares
 │   └── cp-vects.sh                # Sincronización manual a servidor remoto
 ├── data/                          # Datos generados (ignorados por git)
 │   ├── steam-top-games.json       # IDs de juegos filtrados (5,001+)
 │   ├── steam-games-data.ndjson    # Datos completos con descripciones resumidas
 │   └── steam-games-data-vect.ndjson # Datos + embeddings 768-dim (listo para RAG)
+├── backups/                       # Copias de seguridad (ej. steam-top-games-*.json)
 ├── logs/                          # Logs del pipeline (ignorados por git)
 │   ├── scraper_metrics.log        # Logs de gameid-script.py
 │   ├── scraper_full_data_metrics.log # Logs de sacar-datos-games.py
 │   └── setup_fail.log             # Registro de fallos del instalador
-├── setup.sh                       # Instalador completo Linux/Mac (ejecuta pipeline)
+├── .vscode/                       # Configuración local del editor
+├── setup.sh                       # Instalador completo Linux (ejecuta pipeline)
 ├── requirements.txt               # Dependencias (requests, beautifulsoup4, torch CPU, sentence-transformers, openai, etc.)
 ├── .gitignore                     # Ignora data/, logs/, .venv/, caches
 └── README.md                      # Este archivo
@@ -104,6 +105,8 @@ pip install --upgrade -r requirements.txt
 ```bash
 source /home/g6/.venv/bin/activate
 python scripts/run_pipeline.py  # Scraping + limpieza
+terminal -> /home/g6/reto/imp-futuras/flux.sh # Ejecucion del flujo (Resumenes LLM)
+python scripts/desc-changer.py  # Cambio de descripciones viejas a nuevas
 python scripts/vectorizador.py  # Generación de embeddings
 bash sh_test/cp-vects.sh        # Sincronización remota (opcional)
 ```
@@ -113,7 +116,7 @@ bash sh_test/cp-vects.sh        # Sincronización remota (opcional)
 **Fase 1: Obtener IDs de juegos**
 ```bash
 python scripts/gameid-script.py
-# Salida: data/steam-top-games.json (~10k IDs)
+# Salida: data/steam-top-games.json (~5k IDs)
 ```
 
 **Fase 2: Descargar datos completos**
@@ -133,12 +136,14 @@ python scripts/sacar-datos-games.py
 ```bash
 python scripts/filter-games.py
 # Entrada: data/steam-top-games.json
-# Salida: data/steam-top-games.json (filtrada, ~5,001 juegos)
+# Salida: data/steam-top-games-filtered.json (+ backup en backups/)
 ```
 
-**Fase 3: Extracción de descripciones y generación de resúmenes IA**
+**Fase 3: Extracción de descripciones y generación de resúmenes IA (flux.sh)**
 ```bash
-# Ejecutado desde la carpeta imp-futuras (scripts de extracción + OpenRouter)
+cd /home/g6/reto/imp-futuras
+bash flux.sh  # Usa el mismo venv global /home/g6/.venv
+# Salida: resúmenes IA en imp-futuras/data que luego usa desc-changer.py
 ```
 
 **Fase 3.5: Reemplazar descripciones con resúmenes IA**
@@ -155,6 +160,19 @@ python scripts/vectorizador.py
 # Salida: data/steam-games-data-vect.ndjson (+ campo vector_embedding: float[768])
 ```
 
+## 🧭 Orden del pipeline (setup.sh)
+
+1) Verificación de Python + venv global `/home/g6/.venv`
+2) Instalación/verificación de dependencias (torch CPU, sentence-transformers, openai)
+3) Descarga/validación del modelo de embeddings (cache HF)
+4) `run_pipeline.py` → gameid-script.py + sacar-datos-games.py (con sincronización incremental)
+5) `filter-games.py` → filtra DLC/adulto y guarda `steam-top-games-filtered.json`
+6) `imp-futuras/flux.sh` → genera resúmenes IA (OpenRouter)
+7) `desc-changer.py` → inserta resúmenes IA en NDJSON principal
+8) `clean-tags.py` → limpia categorías/tags irrelevantes
+9) `vectorizador.py` → genera embeddings 768D
+10) `scp` opcional → sincroniza NDJSON vectorizado + logs a 192.199.1.65
+
 ## 📊 Formato de Salida (NDJSON)
 
 Cada juego en `steam-games-data-vect.ndjson` es una línea JSON con:
@@ -163,14 +181,24 @@ Cada juego en `steam-games-data-vect.ndjson` es una línea JSON con:
 {
   "appid": 730,
   "name": "Counter-Strike 2",
+  "scraped_at": "2025-12-10 08:20:50",
+  "price_eur": 0.00,
+  "price_initial_eur": 0.0, 
+  "discount_pct": 0,
+  "metacritic_score": 0, // no tiene score
+  "recommendations_total": 4810260,
+  "achievements_count": 1, 
+  "is_free": true,
+  "genres": ["Action", "FPS"],
+  "categories": ["FPS", "Disparos", "Multijugador", "Competitivos" ...], 
+  "developers": ["Valve"], 
+  "publishers": ["Valve"], 
+  "achievements_list": ["Una nueva era"],
   "short_description": "For over two decades...",
   "detailed_description": "Counter-Strike 2 es un videojuego de disparos competitivo...",
-  "genres": ["Action", "FPS"],
-  "categories": ["Multi-player", "Online PvP"],
-  "developers": ["Valve"],
-  "price_eur": "0.00",
   "vector_embedding": [0.0234, -0.1234, ..., 0.0567]  // 768 floats
 }
+
 ```
 
 **Campo clave:** `vector_embedding` → Vector de 768 dimensiones para búsqueda semántica en Elasticsearch con modelo dense_vector.
@@ -282,28 +310,6 @@ O ejecuta el setup completo (verifica instalaciones + ejecuta pipeline):
 - **Venv global**: `/home/g6/.venv` **obligatorio** - compartido entre scraper e imp-futuras
 - **Librerías CPU-only**: PyTorch sin CUDA para ahorrar espacio (~4 GB menos que versión GPU)
 - **Modelos en caché**: `~/.cache/huggingface/hub/` se crea automáticamente (~470MB)
-
-## 📊 Cambios Recientes (Diciembre 2025)
-
-### Setup.sh
-- ✅ Eliminada llamada a `instalar_lib_embeddings.sh` (path issue)
-- ✅ Verificación simplificada de torch/transformers mediante import check
-- ✅ Removed skip conditions → siempre ejecuta pipeline completo
-- ✅ Venv global obligatorio: `/home/g6/.venv`
-
-### sacar-datos-games.py
-- ✅ **Nueva función**: `cargar_ids_desde_ndjson()` - carga IDs existentes
-- ✅ **Nueva función**: `sincronizar_datos()` - compara, elimina obsoletos, reprocesa todos válidos
-- ✅ Log de sincronización: "SINCRONIZACIÓN | Eliminados:X | A reprocesar:Y"
-- ✅ Automatización: sincronización ejecutada antes del loop de scraping
-
-### Sincronización de Datos
-- **Antes**: Todos los juegos se descargaban/procesaban sin importar si existían
-- **Ahora**: 
-  - Compara IDs entre archivo nuevo vs existente
-  - **Elimina** registros de juegos que bajaron del top
-  - **Reprocesa** todos los válidos (sin saltarse ninguno)
-  - Mantiene datos siempre frescos (precios actualizados)
 
 ## 🛠️ Tecnologías
 
