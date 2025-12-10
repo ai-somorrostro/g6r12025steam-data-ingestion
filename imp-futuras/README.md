@@ -1,5 +1,5 @@
-# Resúmenes IA - Pipeline de Descripciones Steam
-
+# Reassadsúmenes IA - Pipeline de Descripciones Steam
+assad
 Pipeline automatizado para generar resúmenes técnicos de juegos de Steam usando OpenRouter GPT-4o-mini. Extrae descripciones desde Steam API y genera resúmenes optimizados para búsqueda semántica (RAG).
 
 ## 📁 Estructura
