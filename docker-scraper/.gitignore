@@ -1,0 +1,9 @@
+# Copias locales de código (no versionar)
+scraper/
+imp-futuras/
+
+# Volúmenes de datos
+volumes/
+
+# Logs locales
+*.log

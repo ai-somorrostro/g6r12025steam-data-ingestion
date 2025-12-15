@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  ofelia:
+    image: mcuadros/ofelia:latest
+    container_name: ofelia-scraper-scheduler
+    depends_on:
+      - scraper
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - TZ=Europe/Madrid
+    restart: unless-stopped
+    networks:
+      - scraper-network
+
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: steam-scraper-complete:latest
+    container_name: steam-scraper-complete
+    restart: no
+    volumes:
+      # Volúmenes para scraper
+      - ./volumes/scraper/data:/app/scraper/data
+      - ./volumes/scraper/logs:/app/scraper/logs
+      - ./volumes/scraper/backups:/app/scraper/backups
+      # Volúmenes para imp-futuras
+      - ./volumes/imp-futuras/data:/app/imp-futuras/data
+      - ./volumes/imp-futuras/backup:/app/imp-futuras/backup
+      # Archivo .env de imp-futuras
+      - ../imp-futuras/.env:/app/imp-futuras/.env:ro
+      # SSH keys para sincronización remota (multiplataforma)
+      - ${SSH_PATH:-~/.ssh}:/root/.ssh:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Europe/Madrid
+    networks:
+      - scraper-network
+    labels:
+      ofelia.enabled: "true"
+      ofelia.job-exec.scraper-daily.schedule: "0 3 * * *"
+      ofelia.job-exec.scraper-daily.command: "/app/entrypoint.sh"
+
+networks:
+  scraper-network:
+    driver: bridge
