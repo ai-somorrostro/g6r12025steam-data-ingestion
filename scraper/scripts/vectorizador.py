@@ -5,9 +5,13 @@ import tempfile
 import shutil
 from sentence_transformers import SentenceTransformer
 
-# --- CONFIGURACION ---
-ARCHIVO_RAW = "/home/g6/reto/scraper/data/steam-games-data.ndjson"
-ARCHIVO_FINAL = "/home/g6/reto/scraper/data/steam-games-data-vect.ndjson"
+# --- CONFIGURACION (RUTAS RELATIVAS) ---
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRAPER_DIR = os.path.dirname(SCRIPT_DIR)  # Sube a /scraper
+DATA_DIR = os.path.join(SCRAPER_DIR, "data")
+
+ARCHIVO_RAW = os.path.join(DATA_DIR, "steam-games-data.ndjson")
+ARCHIVO_FINAL = os.path.join(DATA_DIR, "steam-games-data-vect.ndjson")
 
 # Nombre del modelo (Multilingue)
 MODEL_NAME = 'paraphrase-multilingual-mpnet-base-v2'

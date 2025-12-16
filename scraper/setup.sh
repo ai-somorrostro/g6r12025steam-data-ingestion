@@ -66,7 +66,7 @@ fi
 echo ""
 
 # 3. Usar entorno virtual global unificado
-VENV_GLOBAL="/home/g6/.venv"
+VENV_GLOBAL="${HOME}/.venv"
 
 if [ ! -d "$VENV_GLOBAL" ]; then
     echo "[*] Creando entorno virtual global en $VENV_GLOBAL..."
