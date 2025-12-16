@@ -5,7 +5,7 @@
 set -e  # Salir si algún comando falla
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_GLOBAL="/home/g6/.venv"
+VENV_GLOBAL="${HOME}/.venv"
 REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
 
 echo "=========================================="
