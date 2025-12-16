@@ -319,3 +319,29 @@ O ejecuta el setup completo (verifica instalaciones + ejecuta pipeline):
 - **Backend ML**: PyTorch (CPU-only)
 - **Resúmenes IA**: OpenRouter (GPT-4o-mini) con parallelización
 - **Formato de datos**: NDJSON (compatible con Filebeat/Logstash/Elasticsearch)
+
+
+# Para ¡¡¡ VALIDACION !!!
+
+- **Cambiar nombre de el .env.example  --->  .env  (/imp-futuras)**
+- **poner API KEY de Openrouter en el .env**
+- Cambiar en el archivo **/scraper/scripts/sacar-datos-games.py**
+  
+```python
+
+# 0 = PROCESAR TODOS. Pon un número bajo (ej: 50) para validacion.
+CANTIDAD_A_PROCESAR = 0 # --> 50
+
+```
+
+- Cambiar en el archivo **/scraper/scripts/gameid-scripts**
+
+```python
+
+# 5000 de cada tipo para asegurar variedad (Para Validacion poner 50 en los 2 primeros)
+CANTIDAD_POR_CRITERIO = 5000  # --> 50
+RESULTADOS_POR_PAGINA = 50 
+TIMEOUT = 30
+MAX_REINTENTOS = 3
+
+```
