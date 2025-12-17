@@ -345,3 +345,12 @@ TIMEOUT = 30
 MAX_REINTENTOS = 3
 
 ```
+
+- Por ultimo darle permisos al **setup.sh** y ejecutarlo
+
+```bash
+
+chmod 777 scraper/setup.sh
+./setup.sh
+
+```
